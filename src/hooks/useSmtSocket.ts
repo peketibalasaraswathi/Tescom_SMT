@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useSmtStore } from '../store/useSmtStore';
 import toast from 'react-hot-toast';
-import type { ReplenishmentEvent, SmtComponent } from '../types';
+import type { ReplenishmentEvent, SmtComponent, CategoryInventory } from '../types';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001'; 
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+// Inventory server (port 3002) — handles QR scan pushes
+const INVENTORY_SOCKET_URL = import.meta.env.VITE_INVENTORY_API_URL || 'http://localhost:3002';
 
 function playCriticalChime() {
   try {
@@ -29,6 +31,7 @@ function playCriticalChime() {
 
 export const useSmtSocket = () => {
   const socketRef = useRef<Socket | null>(null);
+  const inventorySocketRef = useRef<Socket | null>(null);
   const previousCriticalSet = useRef<Set<string>>(new Set());
 
   const updateInventoryBatch = useSmtStore((state) => state.updateInventoryBatch);
@@ -37,6 +40,8 @@ export const useSmtSocket = () => {
   const addReplenishmentEvent = useSmtStore((state) => state.addReplenishmentEvent);
   const setReplenishmentHistory = useSmtStore((state) => state.setReplenishmentHistory);
   const soundAlertEnabled = useSmtStore((state) => state.soundAlertEnabled);
+  const setReelInventory = useSmtStore((state) => state.setReelInventory);
+  const updateReelCategory = useSmtStore((state) => state.updateReelCategory);
 
   useEffect(() => {
     socketRef.current = io(SOCKET_URL);
@@ -114,6 +119,25 @@ export const useSmtSocket = () => {
       if (socketRef.current) socketRef.current.disconnect();
     };
   }, [updateInventoryBatch, updateLineStatus, updateLinesData, addReplenishmentEvent, setReplenishmentHistory, soundAlertEnabled]);
+
+  // ── Inventory server socket (port 3002) ──────────────────────────
+  useEffect(() => {
+    inventorySocketRef.current = io(INVENTORY_SOCKET_URL);
+
+    // Full inventory snapshot on connect
+    inventorySocketRef.current.on('reel_inventory_full', (data: Record<string, CategoryInventory>) => {
+      setReelInventory(data);
+    });
+
+    // Single category update after a QR scan
+    inventorySocketRef.current.on('reel_inventory_update', (categoryData: CategoryInventory) => {
+      updateReelCategory(categoryData);
+    });
+
+    return () => {
+      if (inventorySocketRef.current) inventorySocketRef.current.disconnect();
+    };
+  }, [setReelInventory, updateReelCategory]);
 
   return null;
 };

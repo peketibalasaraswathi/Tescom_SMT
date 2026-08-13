@@ -1,0 +1,16 @@
+{
+  "componentType": "DIODE",
+  "reels": [
+    {
+      "reelId": "REEL00006",
+      "partNumber": "BAV99-7-F",
+      "partsId": "PD8001X",
+      "lotId": "LT0040",
+      "initialQuantity": 3000,
+      "remainingQuantity": 3000,
+      "status": "ACTIVE",
+      "scannedAt": "2026-08-13T09:00:00Z",
+      "lastUpdated": "2026-08-13T09:00:00Z"
+    }
+  ]
+}

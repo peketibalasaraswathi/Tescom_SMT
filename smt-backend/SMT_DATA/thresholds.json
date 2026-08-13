@@ -1,0 +1,15 @@
+{
+  "description": "Global inventory threshold configuration for reel quantity alerts.",
+  "global": {
+    "warningQuantity": 1000,
+    "criticalQuantity": 500
+  },
+  "perType": {
+    "RESISTOR":  { "warningQuantity": 1000, "criticalQuantity": 500 },
+    "CAPACITOR": { "warningQuantity": 800,  "criticalQuantity": 400 },
+    "INDUCTOR":  { "warningQuantity": 500,  "criticalQuantity": 200 },
+    "DIODE":     { "warningQuantity": 1000, "criticalQuantity": 500 },
+    "IC":        { "warningQuantity": 200,  "criticalQuantity": 100 },
+    "LED":       { "warningQuantity": 2000, "criticalQuantity": 1000 }
+  }
+}

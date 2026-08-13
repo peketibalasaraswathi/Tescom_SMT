@@ -1,0 +1,16 @@
+{
+  "componentType": "LED",
+  "reels": [
+    {
+      "reelId": "REEL00008",
+      "partNumber": "LTST-C190KFKT",
+      "partsId": "PLED001Y",
+      "lotId": "LT0060",
+      "initialQuantity": 8000,
+      "remainingQuantity": 7200,
+      "status": "ACTIVE",
+      "scannedAt": "2026-08-13T09:30:00Z",
+      "lastUpdated": "2026-08-13T11:00:00Z"
+    }
+  ]
+}
