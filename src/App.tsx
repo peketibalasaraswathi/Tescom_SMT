@@ -1,20 +1,27 @@
 import { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { LayoutList, BarChart3, Radio } from 'lucide-react';
+import { LayoutList, BarChart3, Radio, Layers, QrCode } from 'lucide-react';
 import { useSmtSocket } from './hooks/useSmtSocket';
 import { useSmtStore } from './store/useSmtStore';
+import { useInventoryApi } from './hooks/useInventoryApi';
 import { LineOverview } from './components/dashboard/LineOverview';
 import { KpiSummary } from './components/dashboard/KpiSummary';
 import { FilterBar } from './components/inventory/FilterBar';
 import { ComponentTable } from './components/inventory/ComponentTable';
 import { ComponentChart } from './components/inventory/ComponentChart';
+import { ReelInventoryTable } from './components/inventory/ReelInventoryTable';
+import { ReelScanPanel } from './components/inventory/ReelScanPanel';
 import { ReplenishmentLogModal } from './components/dashboard/ReplenishmentLogModal';
 import { CsvInspectorModal } from './components/dashboard/CsvInspectorModal';
 import clsx from 'clsx';
 
+type MainTab = 'live-feeders' | 'reel-inventory';
+
 function App() {
   useSmtSocket();
+  useInventoryApi(); // Connects to inventory server, loads master config + reel data
   
+  const [mainTab, setMainTab] = useState<MainTab>('live-feeders');
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
 
   const activeLineId = useSmtStore(state => state.activeLineId);
@@ -80,38 +87,85 @@ function App() {
           </section>
         )}
 
-        {/* Inventory View Controls */}
+        {/* ── MAIN TAB NAVIGATION ──────────────────────────────────────── */}
         <section className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-lg font-extrabold text-gray-800 tracking-tight">Live Feeder Inventory</h2>
             
-            <div className="flex bg-gray-200/80 p-1 rounded-xl self-start sm:self-auto">
+            {/* Tab Switcher */}
+            <div className="flex bg-gray-200/80 p-1 rounded-xl self-start">
               <button
-                onClick={() => setViewMode('table')}
+                id="tab-live-feeders"
+                onClick={() => setMainTab('live-feeders')}
                 className={clsx(
                   "flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200",
-                  viewMode === 'table' ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                  mainTab === 'live-feeders' ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
                 )}
               >
-                <LayoutList className="w-4 h-4" /> Table View
+                <LayoutList className="w-4 h-4" /> Live Feeder Inventory
               </button>
               <button
-                onClick={() => setViewMode('chart')}
+                id="tab-reel-inventory"
+                onClick={() => setMainTab('reel-inventory')}
                 className={clsx(
                   "flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200",
-                  viewMode === 'chart' ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                  mainTab === 'reel-inventory' ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
                 )}
               >
-                <BarChart3 className="w-4 h-4" /> Bar Chart View
+                <Layers className="w-4 h-4" /> Reel Inventory
               </button>
             </div>
+
+            {/* Right controls — context-sensitive */}
+            {mainTab === 'live-feeders' && (
+              <div className="flex bg-gray-200/80 p-1 rounded-xl self-start sm:self-auto">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={clsx(
+                    "flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200",
+                    viewMode === 'table' ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                  )}
+                >
+                  <LayoutList className="w-4 h-4" /> Table View
+                </button>
+                <button
+                  onClick={() => setViewMode('chart')}
+                  className={clsx(
+                    "flex items-center gap-2 px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-200",
+                    viewMode === 'chart' ? "bg-white text-blue-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                  )}
+                >
+                  <BarChart3 className="w-4 h-4" /> Bar Chart View
+                </button>
+              </div>
+            )}
+
+            {mainTab === 'reel-inventory' && (
+              <div className="flex items-center gap-1.5 text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg">
+                <QrCode className="w-3.5 h-3.5" />
+                <span>JSON-driven · No code changes needed to add component types</span>
+              </div>
+            )}
           </div>
 
-          {/* Search & Status Filter Bar */}
-          <FilterBar />
+          {/* ── LIVE FEEDER INVENTORY TAB (existing, unchanged) ──────── */}
+          {mainTab === 'live-feeders' && (
+            <>
+              <h2 className="text-lg font-extrabold text-gray-800 tracking-tight">Live Feeder Inventory</h2>
+              <FilterBar />
+              {viewMode === 'table' ? <ComponentTable /> : <ComponentChart />}
+            </>
+          )}
 
-          {/* Table or Chart Component */}
-          {viewMode === 'table' ? <ComponentTable /> : <ComponentChart />}
+          {/* ── REEL INVENTORY TAB (new JSON-driven system) ──────────── */}
+          {mainTab === 'reel-inventory' && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-extrabold text-gray-800 tracking-tight">Reel Inventory</h2>
+              {/* QR Scan Panel at top */}
+              <ReelScanPanel />
+              {/* Reel table below — categories driven by MASTER.json */}
+              <ReelInventoryTable />
+            </div>
+          )}
 
         </section>
 

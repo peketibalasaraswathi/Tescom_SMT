@@ -1,0 +1,31 @@
+{
+  "description": "QR / Barcode field mapping. The actual format is: PART_NUMBER$PARTS_ID$LOT_ID$INITIAL_QUANTITY. Change separator or field positions here if scanner format changes. No source code changes needed.",
+  "separator": "$",
+  "fields": [
+    {
+      "position": 0,
+      "name": "partNumber",
+      "required": true,
+      "description": "Manufacturer part number — used to look up component type in MASTER.json"
+    },
+    {
+      "position": 1,
+      "name": "partsId",
+      "required": true,
+      "description": "Parts ID / serial identifier from the reel label"
+    },
+    {
+      "position": 2,
+      "name": "lotId",
+      "required": true,
+      "description": "Manufacturing lot ID"
+    },
+    {
+      "position": 3,
+      "name": "initialQuantity",
+      "transform": "parseInt",
+      "required": true,
+      "description": "Initial component quantity on the reel"
+    }
+  ]
+}

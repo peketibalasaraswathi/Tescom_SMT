@@ -1,0 +1,37 @@
+{
+  "description": "SMT production line configuration. Add or remove lines here without modifying any source code.",
+  "lines": [
+    {
+      "id": "line_1",
+      "name": "SMT Line 1 (YSM20R)",
+      "defaultThresholds": {
+        "warning": 1000,
+        "critical": 500
+      }
+    },
+    {
+      "id": "line_2",
+      "name": "SMT Line 2",
+      "defaultThresholds": {
+        "warning": 800,
+        "critical": 400
+      }
+    },
+    {
+      "id": "line_3",
+      "name": "SMT Line 3",
+      "defaultThresholds": {
+        "warning": 600,
+        "critical": 300
+      }
+    },
+    {
+      "id": "line_4",
+      "name": "SMT Line 4",
+      "defaultThresholds": {
+        "warning": 1000,
+        "critical": 500
+      }
+    }
+  ]
+}

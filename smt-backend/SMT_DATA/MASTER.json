@@ -1,0 +1,86 @@
+{
+  "version": "2.0",
+  "description": "Master configuration file. TWO sections: (1) partMappings routes a scanned Part Number to its component category and JSON file. (2) componentTypes defines display metadata for each category. To add a new component type: add display entry to componentTypes, create the JSON file, then add part number mappings to partMappings. ZERO source code changes needed.",
+
+  "partMappings": {
+    "GME34681008DJRE": {
+      "componentType": "CAPACITOR",
+      "file": "CAPACITOR.json",
+      "description": "50V 100nF MLCC Capacitor"
+    },
+    "GRM155R71C104KA88D": {
+      "componentType": "CAPACITOR",
+      "file": "CAPACITOR.json",
+      "description": "25V 100nF MLCC Capacitor"
+    },
+    "RC0402FR-0710KL": {
+      "componentType": "RESISTOR",
+      "file": "RESISTOR.json",
+      "description": "10K Ohm 1% 0402 Resistor"
+    },
+    "RC0402FR-0747KL": {
+      "componentType": "RESISTOR",
+      "file": "RESISTOR.json",
+      "description": "47K Ohm 1% 0402 Resistor"
+    },
+    "LQG15HS10NJ02D": {
+      "componentType": "INDUCTOR",
+      "file": "INDUCTOR.json",
+      "description": "10nH SMD Inductor"
+    },
+    "BAV99-7-F": {
+      "componentType": "DIODE",
+      "file": "DIODE.json",
+      "description": "Dual Series Switching Diode"
+    },
+    "STM32F103C8T6": {
+      "componentType": "IC",
+      "file": "IC.json",
+      "description": "STM32 ARM Cortex-M3 MCU"
+    },
+    "LTST-C190KFKT": {
+      "componentType": "LED",
+      "file": "LED.json",
+      "description": "Orange SMD LED 0402"
+    }
+  },
+
+  "componentTypes": {
+    "RESISTOR": {
+      "file": "RESISTOR.json",
+      "label": "Resistor",
+      "color": "#3B82F6",
+      "symbol": "R"
+    },
+    "CAPACITOR": {
+      "file": "CAPACITOR.json",
+      "label": "Capacitor",
+      "color": "#10B981",
+      "symbol": "C"
+    },
+    "INDUCTOR": {
+      "file": "INDUCTOR.json",
+      "label": "Inductor",
+      "color": "#8B5CF6",
+      "symbol": "L"
+    },
+    "DIODE": {
+      "file": "DIODE.json",
+      "label": "Diode",
+      "color": "#F59E0B",
+      "symbol": "D"
+    },
+    "IC": {
+      "file": "IC.json",
+      "label": "IC / Chip",
+      "color": "#EF4444",
+      "symbol": "U"
+    },
+    "LED": {
+      "file": "LED.json",
+      "label": "LED",
+      "color": "#EC4899",
+      "symbol": "LED"
+    }
+  }
+}

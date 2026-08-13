@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SmtComponent, SmtLine, ReplenishmentEvent, StatusFilterType } from '../types';
+import type { SmtComponent, SmtLine, ReplenishmentEvent, StatusFilterType, CategoryInventory, MasterConfig } from '../types';
 
 interface SmtState {
   activeLineId: string;
@@ -18,6 +18,14 @@ interface SmtState {
   isReplenishmentModalOpen: boolean;
   isCsvInspectorOpen: boolean;
 
+  // ── REEL INVENTORY (JSON-driven) ──────────────────────────────
+  /** Full reel inventory keyed by component type (e.g. "RESISTOR") */
+  reelInventory: Record<string, CategoryInventory>;
+  /** Parsed MASTER.json — defines which types exist and their metadata */
+  masterConfig: MasterConfig | null;
+  /** Whether the reel inventory is loading from the backend */
+  isReelInventoryLoading: boolean;
+
   // Actions
   setActiveLine: (lineId: string) => void;
   setSearchQuery: (query: string) => void;
@@ -32,6 +40,15 @@ interface SmtState {
   
   addReplenishmentEvent: (event: ReplenishmentEvent) => void;
   setReplenishmentHistory: (events: ReplenishmentEvent[]) => void;
+
+  // ── REEL INVENTORY ACTIONS ────────────────────────────────────
+  /** Set the full inventory snapshot (called on initial load or full refresh) */
+  setReelInventory: (inventory: Record<string, CategoryInventory>) => void;
+  /** Update a single category (called when socket emits reel_inventory_update) */
+  updateReelCategory: (categoryData: CategoryInventory) => void;
+  /** Set master config loaded from /api/config/master */
+  setMasterConfig: (config: MasterConfig) => void;
+  setIsReelInventoryLoading: (loading: boolean) => void;
 }
 
 export const useSmtStore = create<SmtState>((set) => ({
@@ -50,6 +67,11 @@ export const useSmtStore = create<SmtState>((set) => ({
   soundAlertEnabled: true,
   isReplenishmentModalOpen: false,
   isCsvInspectorOpen: false,
+
+  // Reel inventory initial state
+  reelInventory: {},
+  masterConfig: null,
+  isReelInventoryLoading: false,
 
   setActiveLine: (lineId) => set({ activeLineId: lineId }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
@@ -83,5 +105,18 @@ export const useSmtStore = create<SmtState>((set) => ({
     replenishmentEvents: [event, ...state.replenishmentEvents.filter(e => e.id !== event.id)].slice(0, 100)
   })),
 
-  setReplenishmentHistory: (events) => set({ replenishmentEvents: events })
+  setReplenishmentHistory: (events) => set({ replenishmentEvents: events }),
+
+  // ── REEL INVENTORY ACTIONS ────────────────────────────────────
+  setReelInventory: (inventory) => set({ reelInventory: inventory }),
+
+  updateReelCategory: (categoryData) => set((state) => ({
+    reelInventory: {
+      ...state.reelInventory,
+      [categoryData.componentType]: categoryData
+    }
+  })),
+
+  setMasterConfig: (config) => set({ masterConfig: config }),
+  setIsReelInventoryLoading: (loading) => set({ isReelInventoryLoading: loading }),
 }));

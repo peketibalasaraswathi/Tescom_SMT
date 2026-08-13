@@ -1,0 +1,16 @@
+{
+  "componentType": "IC",
+  "reels": [
+    {
+      "reelId": "REEL00007",
+      "partNumber": "STM32F103C8T6",
+      "partsId": "PU9001M",
+      "lotId": "LT0050",
+      "initialQuantity": 500,
+      "remainingQuantity": 500,
+      "status": "ACTIVE",
+      "scannedAt": "2026-08-13T09:15:00Z",
+      "lastUpdated": "2026-08-13T09:15:00Z"
+    }
+  ]
+}
