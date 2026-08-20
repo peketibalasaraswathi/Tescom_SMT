@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect } from 'react';
 import { useSmtStore } from '../store/useSmtStore';
-import type { ScanResult, MasterConfig, CategoryInventory } from '../types';
+import type { ScanResult, MasterConfig, CategoryInventory, ReelRecord } from '../types';
 import toast from 'react-hot-toast';
 
 const INVENTORY_API = import.meta.env.VITE_INVENTORY_API_URL || 'http://localhost:3002';
@@ -63,6 +63,27 @@ export function useInventoryApi() {
       setIsReelInventoryLoading(false);
     }
   }, [setReelInventory, setIsReelInventoryLoading]);
+
+  // ── Fetch all historical records from Excel archives ───────────
+  const fetchAllHistory = useCallback(async (): Promise<Record<string, ReelRecord[]>> => {
+    try {
+      return await apiFetch<Record<string, ReelRecord[]>>('/api/inventory/history/all');
+    } catch (err: any) {
+      console.error('[useInventoryApi] Failed to fetch all history:', err.message);
+      return {};
+    }
+  }, []);
+
+  // ── Fetch single category historical records from Excel ────────
+  const fetchCategoryHistory = useCallback(async (componentType: string): Promise<ReelRecord[]> => {
+    try {
+      const res = await apiFetch<{ componentType: string; totalReels: number; reels: ReelRecord[] }>(`/api/inventory/${encodeURIComponent(componentType)}/history`);
+      return res.reels || [];
+    } catch (err: any) {
+      console.error(`[useInventoryApi] Failed to fetch history for ${componentType}:`, err.message);
+      return [];
+    }
+  }, []);
 
   // ── Fetch a single category ──────────────────────────────────────
   const fetchCategory = useCallback(async (componentType: string) => {
@@ -196,6 +217,8 @@ export function useInventoryApi() {
     fetchMasterConfig,
     fetchAllInventory,
     fetchCategory,
+    fetchAllHistory,
+    fetchCategoryHistory,
     submitScan,
     updateReelQuantity,
     deleteReel,

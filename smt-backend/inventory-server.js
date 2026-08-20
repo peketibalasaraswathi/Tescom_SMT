@@ -373,6 +373,20 @@ app.get('/api/inventory/:type/history', async (req, res) => {
   }
 });
 
+// GET /api/inventory/history/all — All historical records across all categories from Excel
+app.get('/api/inventory/history/all', async (_req, res) => {
+  try {
+    const master = loadMaster();
+    const result = {};
+    for (const type of Object.keys(master.componentTypes || {})) {
+      result[type] = await excelManager.readReelsFromExcel(DATA_DIR, type);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'HISTORY_ERROR', message: err.message });
+  }
+});
+
 // GET /api/inventory/export/all-excel — Download consolidated multi-sheet Excel
 app.get('/api/inventory/export/all-excel', async (_req, res) => {
   try {
@@ -498,6 +512,7 @@ app.post('/api/scan', async (req, res) => {
 
     // ── STEP 8: Broadcast recent scan via Socket.io ──────────────────
     broadcastUpdate(categoryData);
+    io.emit('excel_reel_scanned', { componentType, reel: reelRecord });
 
     // ── STEP 9: Respond ──────────────────────────────────────────────
     const httpStatus = action === 'created' ? 201 : 200;
