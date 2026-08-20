@@ -8,11 +8,17 @@
  * QR fields shown: partNumber, partsId, lotId, initialQuantity, remainingQuantity
  * Alert levels (OK, Warning, Critical) are computed on the backend using 
  * the absolute quantities defined in thresholds.json.
+ *
+ * RECENT SCAN + EXCEL ARCHIVE:
+ *  - The dashboard table displays the single MOST RECENT scanned reel for each category.
+ *  - Complete historical records are stored in dedicated Excel (.xlsx) files per category.
+ *  - Direct download buttons are provided per category and for the master workbook.
  */
 
 import { useMemo, useState } from 'react';
 import { useSmtStore } from '../../store/useSmtStore';
-import { Package, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2, XCircle, Loader2, Layers } from 'lucide-react';
+import { useInventoryApi } from '../../hooks/useInventoryApi';
+import { Package, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2, XCircle, Loader2, Layers, FileSpreadsheet, Download, Clock } from 'lucide-react';
 import clsx from 'clsx';
 import type { ReelRecord, MasterComponentEntry } from '../../types';
 
@@ -63,9 +69,10 @@ interface CategoryAccordionProps {
   componentType: string;
   meta: MasterComponentEntry;
   reels: ReelRecord[];
+  onDownloadExcel: (componentType: string) => void;
 }
 
-function CategoryAccordion({ componentType, meta, reels }: CategoryAccordionProps) {
+function CategoryAccordion({ componentType, meta, reels, onDownloadExcel }: CategoryAccordionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
   // Compute alert counts from backend-computed status
@@ -73,11 +80,11 @@ function CategoryAccordion({ componentType, meta, reels }: CategoryAccordionProp
   const warningCount  = reels.filter(r => r.computedStatus === 'warning').length;
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+    <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white">
       {/* Header — clickable */}
-      <button
+      <div
         onClick={() => setIsOpen(o => !o)}
-        className="w-full flex items-center justify-between px-5 py-3.5 bg-white hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 bg-white hover:bg-gray-50/80 transition-colors cursor-pointer select-none"
       >
         <div className="flex items-center gap-3">
           <div
@@ -102,16 +109,44 @@ function CategoryAccordion({ componentType, meta, reels }: CategoryAccordionProp
           )}
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
-            {reels.length} reel{reels.length !== 1 ? 's' : ''}
-          </span>
-          {isOpen
-            ? <ChevronDown className="w-4 h-4 text-gray-400" />
-            : <ChevronRight className="w-4 h-4 text-gray-400" />
-          }
+        <div className="flex items-center gap-2 sm:gap-3" onClick={e => e.stopPropagation()}>
+          {/* Recent scan badge */}
+          {reels.length > 0 ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 rounded-full">
+              <Clock className="w-3 h-3 text-blue-500" /> Recent Scan
+            </span>
+          ) : (
+            <span className="text-xs text-gray-400 italic">No Scans Yet</span>
+          )}
+
+          {/* Download Category Excel Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownloadExcel(componentType);
+            }}
+            title={`Download complete historical log for ${meta.label} (${componentType}.xlsx)`}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-all active:scale-95 shadow-2xs"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="hidden sm:inline">Excel Log</span>
+            <Download className="w-3 h-3 text-emerald-600" />
+          </button>
+
+          {/* Accordion expand/collapse */}
+          <button
+            type="button"
+            onClick={() => setIsOpen(o => !o)}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+          >
+            {isOpen
+              ? <ChevronDown className="w-4 h-4 text-gray-400" />
+              : <ChevronRight className="w-4 h-4 text-gray-400" />
+            }
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Table */}
       {isOpen && (
@@ -149,7 +184,12 @@ function CategoryAccordion({ componentType, meta, reels }: CategoryAccordionProp
                           isWarning  && 'bg-yellow-50/40'
                         )}
                       >
-                        <td className="px-4 py-3 font-mono text-xs font-bold text-blue-700">{reel.reelId}</td>
+                        <td className="px-4 py-3 font-mono text-xs font-bold text-blue-700">
+                          <div className="flex items-center gap-1.5">
+                            <span>{reel.reelId}</span>
+                            <span className="text-[10px] uppercase font-sans font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded">Latest</span>
+                          </div>
+                        </td>
                         <td className="px-4 py-3 font-medium text-gray-900 font-mono text-xs">{reel.partNumber}</td>
                         <td className="px-4 py-3 text-xs text-gray-600 font-mono">{reel.partsId}</td>
                         <td className="px-4 py-3 text-xs text-gray-500 font-mono">{reel.lotId}</td>
@@ -188,6 +228,7 @@ export function ReelInventoryTable() {
   const reelInventory = useSmtStore(s => s.reelInventory);
   const masterConfig  = useSmtStore(s => s.masterConfig);
   const isLoading     = useSmtStore(s => s.isReelInventoryLoading);
+  const { downloadCategoryExcel, downloadAllExcel } = useInventoryApi();
 
   // Global stats computed from backend status
   const stats = useMemo(() => {
@@ -224,10 +265,35 @@ export function ReelInventoryTable() {
 
   return (
     <div className="space-y-4">
+      {/* Top Banner with Stats & Master Excel Export */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <div>
+          <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+            <span>Category Overview</span>
+            <span className="text-[11px] font-normal text-gray-500 bg-gray-100 px-2 py-0.5 rounded-md">
+              Dashboard shows most recent scan · Full history saved in Excel
+            </span>
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Real-time synchronization with category JSON files and Excel (<code className="font-mono text-gray-700">.xlsx</code>) archives
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={downloadAllExcel}
+          className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-all active:scale-95 self-start md:self-auto"
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>Export Master Excel (All Categories)</span>
+          <Download className="w-3.5 h-3.5 ml-0.5" />
+        </button>
+      </div>
+
       {/* Stats Bar */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Total Reels', value: stats.total,    color: 'text-gray-900',   bg: 'bg-white' },
+          { label: 'Active Categories', value: Object.keys(reelInventory).filter(k => (reelInventory[k]?.reels?.length ?? 0) > 0).length, color: 'text-gray-900', bg: 'bg-white' },
           { label: 'OK',          value: stats.ok,       color: 'text-green-700',  bg: 'bg-green-50' },
           { label: 'Warning',     value: stats.warning,  color: 'text-yellow-700', bg: 'bg-yellow-50' },
           { label: 'Critical',    value: stats.critical, color: 'text-red-700',    bg: 'bg-red-50' },
@@ -239,7 +305,7 @@ export function ReelInventoryTable() {
         ))}
       </div>
 
-      {/* Category Accordions — rendered from MASTER.json, zero hardcoded categories */}
+      {/* Category Accordions — rendered from MASTER.json */}
       <div className="space-y-3">
         {Object.entries(masterConfig.componentTypes).map(([type, meta]) => {
           const categoryData = reelInventory[type];
@@ -250,6 +316,7 @@ export function ReelInventoryTable() {
               componentType={type}
               meta={meta}
               reels={reels}
+              onDownloadExcel={downloadCategoryExcel}
             />
           );
         })}

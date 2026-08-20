@@ -154,6 +154,38 @@ export function useInventoryApi() {
     }
   }, [fetchCategory, fetchAllInventory]);
 
+  // ── Download Category Excel ─────────────────────────────────────
+  const downloadCategoryExcel = useCallback((componentType: string) => {
+    try {
+      const url = `${INVENTORY_API}/api/inventory/${encodeURIComponent(componentType)}/excel`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${componentType}_Reel_Inventory.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success(`Downloading ${componentType}.xlsx...`, { icon: '📊' });
+    } catch (err: any) {
+      toast.error(`Download failed: ${err.message}`);
+    }
+  }, []);
+
+  // ── Download All Categories Master Excel ─────────────────────────
+  const downloadAllExcel = useCallback(() => {
+    try {
+      const url = `${INVENTORY_API}/api/inventory/export/all-excel`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SMT_All_Categories_Inventory.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success('Downloading Master Excel Workbook...', { icon: '📊' });
+    } catch (err: any) {
+      toast.error(`Download failed: ${err.message}`);
+    }
+  }, []);
+
   // ── Auto-load on mount ───────────────────────────────────────────
   useEffect(() => {
     fetchMasterConfig();
@@ -167,5 +199,7 @@ export function useInventoryApi() {
     submitScan,
     updateReelQuantity,
     deleteReel,
+    downloadCategoryExcel,
+    downloadAllExcel
   };
 }

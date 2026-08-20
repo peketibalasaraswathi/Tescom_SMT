@@ -150,7 +150,10 @@ export function ReelScanPanel() {
                 <div><span className="text-green-600 font-medium">Parts ID:</span> <code className="font-mono text-green-800">{lastResult.partsId}</code></div>
                 <div><span className="text-green-600 font-medium">Lot ID:</span> <code className="font-mono text-green-800">{lastResult.lotId}</code></div>
                 <div><span className="text-green-600 font-medium">Qty:</span> <span className="font-bold text-green-900">{lastResult.initialQuantity?.toLocaleString()}</span></div>
-                <div className="col-span-2"><span className="text-green-600 font-medium">Saved to:</span> <code className="font-mono text-green-700">{lastResult.file}</code></div>
+                <div className="col-span-2 space-y-0.5 mt-1 border-t border-green-200/60 pt-1">
+                  <div><span className="text-green-700 font-medium">Dashboard / Child JSON:</span> <code className="font-mono text-green-800 bg-green-100/70 px-1 rounded">{lastResult.file} (Recent Scan)</code></div>
+                  <div><span className="text-green-700 font-medium">Historical Excel Log:</span> <code className="font-mono text-green-800 bg-green-100/70 px-1 rounded">{lastResult.excelFile || `${lastResult.componentType}.xlsx`} (Complete Archive)</code></div>
+                </div>
               </div>
             </div>
           </div>

@@ -2,17 +2,6 @@
   "componentType": "RESISTOR",
   "reels": [
     {
-      "reelId": "REEL00003",
-      "partNumber": "RC0402FR-0710KL",
-      "partsId": "PR1001A",
-      "lotId": "LT0020",
-      "initialQuantity": 5000,
-      "remainingQuantity": 5000,
-      "status": "ACTIVE",
-      "scannedAt": "2026-08-13T08:15:00Z",
-      "lastUpdated": "2026-08-13T08:15:00Z"
-    },
-    {
       "reelId": "REEL00004",
       "partNumber": "RC0402FR-0747KL",
       "partsId": "PR1002B",
