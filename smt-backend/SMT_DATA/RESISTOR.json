@@ -2,26 +2,16 @@
   "componentType": "RESISTOR",
   "reels": [
     {
-      "reelId": "REEL00003",
+      "reelId": "REEL00012",
       "partNumber": "RC0402FR-0710KL",
-      "partsId": "PR1001A",
-      "lotId": "LT0020",
+      "partsId": "PSRES99",
+      "lotId": "LT-LIVE",
       "initialQuantity": 5000,
       "remainingQuantity": 5000,
       "status": "ACTIVE",
-      "scannedAt": "2026-08-13T08:15:00Z",
-      "lastUpdated": "2026-08-13T08:15:00Z"
-    },
-    {
-      "reelId": "REEL00004",
-      "partNumber": "RC0402FR-0747KL",
-      "partsId": "PR1002B",
-      "lotId": "LT0021",
-      "initialQuantity": 5000,
-      "remainingQuantity": 3800,
-      "status": "ACTIVE",
-      "scannedAt": "2026-08-13T08:30:00Z",
-      "lastUpdated": "2026-08-13T12:00:00Z"
+      "scannedAt": "2026-08-20T07:35:38.767Z",
+      "lastUpdated": "2026-08-20T07:35:38.767Z",
+      "computedStatus": "ok"
     }
   ]
 }

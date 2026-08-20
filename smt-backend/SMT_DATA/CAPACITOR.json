@@ -2,48 +2,16 @@
   "componentType": "CAPACITOR",
   "reels": [
     {
-      "reelId": "REEL00001",
+      "reelId": "REEL00011",
       "partNumber": "GME34681008DJRE",
-      "partsId": "PP2344F",
-      "lotId": "LT0016",
-      "initialQuantity": 10000,
-      "remainingQuantity": 10000,
-      "status": "ACTIVE",
-      "scannedAt": "2026-08-13T08:00:00Z",
-      "lastUpdated": "2026-08-13T08:00:00Z"
-    },
-    {
-      "reelId": "REEL00002",
-      "partNumber": "GRM155R71C104KA88D",
-      "partsId": "PP2399A",
-      "lotId": "LT0017",
-      "initialQuantity": 4000,
-      "remainingQuantity": 3200,
-      "status": "ACTIVE",
-      "scannedAt": "2026-08-13T09:00:00Z",
-      "lastUpdated": "2026-08-13T11:30:00Z"
-    },
-    {
-      "reelId": "REEL00009",
-      "partNumber": "GME34681008DJRE",
-      "partsId": "PSHCPPR",
-      "lotId": "LT-TEST",
+      "partsId": "PSNEW1",
+      "lotId": "LT-EXCEL",
       "initialQuantity": 5000,
       "remainingQuantity": 5000,
       "status": "ACTIVE",
-      "scannedAt": "2026-08-13T15:03:08.501Z",
-      "lastUpdated": "2026-08-13T15:03:08.501Z"
-    },
-    {
-      "reelId": "REEL00010",
-      "partNumber": "GRM155R71C104KA88D",
-      "partsId": "PS2NK7N",
-      "lotId": "LT-TEST",
-      "initialQuantity": 5000,
-      "remainingQuantity": 5000,
-      "status": "ACTIVE",
-      "scannedAt": "2026-08-13T15:14:57.654Z",
-      "lastUpdated": "2026-08-13T15:14:57.654Z"
+      "scannedAt": "2026-08-20T07:11:53.082Z",
+      "lastUpdated": "2026-08-20T07:11:53.082Z",
+      "computedStatus": "ok"
     }
   ]
 }

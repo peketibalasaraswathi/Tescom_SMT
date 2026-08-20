@@ -13,6 +13,7 @@ import { ReelInventoryTable } from './components/inventory/ReelInventoryTable';
 import { ReelScanPanel } from './components/inventory/ReelScanPanel';
 import { ReplenishmentLogModal } from './components/dashboard/ReplenishmentLogModal';
 import { CsvInspectorModal } from './components/dashboard/CsvInspectorModal';
+import { LiveExcelModal } from './components/inventory/LiveExcelModal';
 import clsx from 'clsx';
 
 type MainTab = 'live-feeders' | 'reel-inventory';
@@ -174,6 +175,7 @@ function App() {
       {/* Slide-over & Modal Windows */}
       <ReplenishmentLogModal />
       <CsvInspectorModal />
+      <LiveExcelModal />
 
     </div>
   );

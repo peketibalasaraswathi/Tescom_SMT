@@ -10,20 +10,23 @@
  *   1. Parse QR  →  extract partNumber
  *   2. MASTER.json partMappings[partNumber]  →  componentType + file
  *   3. Open/create that category JSON file
- *   4. Duplicate check: same partNumber + partsId + lotId  →  update existing
- *   5. New reel: generate next REEL ID  →  insert
- *   6. Save file  →  broadcast via Socket.io
+ *   4. Save complete historical reel record to category Excel (.xlsx) file
+ *   5. Save ONLY the most recent scan in child JSON file for live dashboard
+ *   6. Broadcast via Socket.io
  *
  * REST API:
  *   GET  /api/health
  *   GET  /api/config/master
  *   GET  /api/config/qr-format
  *   GET  /api/config/lines
- *   GET  /api/inventory               — all categories
- *   GET  /api/inventory/:type         — single category
- *   POST /api/scan                    — submit raw QR string
- *   PUT  /api/reel/:reelId/quantity   — update remaining quantity (machine consumption)
- *   DELETE /api/reel/:reelId          — remove a reel
+ *   GET  /api/inventory                    — all categories (recent scan only)
+ *   GET  /api/inventory/:type              — single category (recent scan only)
+ *   GET  /api/inventory/:type/excel        — download category Excel file (.xlsx)
+ *   GET  /api/inventory/:type/history      — all historical reels from Excel
+ *   GET  /api/inventory/export/all-excel   — download master multi-sheet Excel file
+ *   POST /api/scan                         — submit raw QR string
+ *   PUT  /api/reel/:reelId/quantity        — update remaining quantity
+ *   DELETE /api/reel/:reelId               — remove a reel
  */
 
 const express = require('express');
@@ -32,6 +35,7 @@ const fs      = require('fs');
 const path    = require('path');
 const { Server } = require('socket.io');
 const http    = require('http');
+const excelManager = require('./excel-manager');
 
 // ─── CONFIGURATION ────────────────────────────────────────────────────────────
 const PORT     = process.env.INVENTORY_PORT || 3002;
@@ -90,14 +94,6 @@ function generateNextReelId() {
 }
 
 // ─── QR PARSER ───────────────────────────────────────────────────────────────
-/**
- * Parse a raw QR string using qr-format.json configuration.
- *
- * Actual format: GME34681008DJRE$PP2344F$LT0016$10000
- *
- * Returns: { partNumber, partsId, lotId, initialQuantity }
- * Throws if required fields are missing.
- */
 function parseQrString(rawString, qrFormat) {
   const sep   = qrFormat.separator || '$';
   const parts = rawString.trim().split(sep);
@@ -137,12 +133,6 @@ function parseQrString(rawString, qrFormat) {
 }
 
 // ─── MASTER LOOKUP: Part Number → Category File ───────────────────────────────
-/**
- * Given a partNumber, look it up in MASTER.json partMappings section.
- * Returns { componentType, file, description } or throws.
- *
- * NO if/else per component type. All routing is data-driven from MASTER.json.
- */
 function resolvePartNumber(partNumber, master) {
   const mapping = master.partMappings && master.partMappings[partNumber];
   if (!mapping) {
@@ -157,15 +147,6 @@ function resolvePartNumber(partNumber, master) {
 }
 
 // ─── DUPLICATE DETECTION ─────────────────────────────────────────────────────
-/**
- * A physical reel is uniquely identified by the combination of:
- *   partNumber + partsId + lotId
- *
- * If all three match an existing reel, this is the SAME physical reel
- * being scanned again (not a new reel).
- *
- * Returns the existing reel object if found, null otherwise.
- */
 function findExistingReel(categoryData, partNumber, partsId, lotId) {
   return (categoryData.reels || []).find(
     r => r.partNumber === partNumber &&
@@ -183,15 +164,6 @@ function loadThresholds() {
   }
 }
 
-/**
- * Compute reel status using thresholds.json absolute quantity values.
- * Checks per-component-type thresholds first, falls back to global.
- *
- * Status:
- *   CRITICAL  — remainingQuantity <= criticalQuantity
- *   WARNING   — remainingQuantity <= warningQuantity
- *   OK        — remainingQuantity > warningQuantity
- */
 function computeReelStatus(reel, componentType) {
   const thresholds = loadThresholds();
   const perType = (thresholds.perType || {})[componentType] || {};
@@ -226,6 +198,43 @@ function enrichWithStatus(categoryData) {
 // ─── BROADCAST ────────────────────────────────────────────────────────────────
 function broadcastUpdate(categoryData) {
   io.emit('reel_inventory_update', enrichWithStatus(categoryData));
+}
+
+// ─── STARTUP MIGRATION / INITIALIZATION ───────────────────────────────────────
+/**
+ * Ensures that all existing historical reels in JSON files are stored into
+ * their respective .xlsx files, and that the JSON files only hold the single
+ * most recent scanned reel.
+ */
+async function initializeExcelArchivesAndPruneJson() {
+  try {
+    const master = loadMaster();
+    for (const [type, meta] of Object.entries(master.componentTypes || {})) {
+      const jsonPath = path.join(DATA_DIR, meta.file);
+      if (!fs.existsSync(jsonPath)) continue;
+
+      let catData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+      const reels = catData.reels || [];
+
+      // 1. Ensure Excel file exists and contains all historical reels
+      const excelPath = excelManager.getExcelPath(DATA_DIR, type);
+      if (!fs.existsSync(excelPath) && reels.length > 0) {
+        await excelManager.syncCategoryReelsToExcel(DATA_DIR, type, reels, meta);
+        console.log(`[Excel Init] Created ${type}.xlsx with ${reels.length} historical reel(s)`);
+      }
+
+      // 2. Prune JSON file to contain ONLY the single most recent reel
+      if (reels.length > 1) {
+        // Sort descending by scannedAt / lastUpdated
+        reels.sort((a, b) => new Date(b.lastUpdated || b.scannedAt || 0) - new Date(a.lastUpdated || a.scannedAt || 0));
+        catData.reels = [reels[0]]; // Keep only the latest reel
+        writeJsonFile(meta.file, catData);
+        console.log(`[JSON Prune] Kept 1 most recent reel (${catData.reels[0].reelId}) in ${meta.file}`);
+      }
+    }
+  } catch (err) {
+    console.error('[Excel Init Error] Failed during startup migration:', err.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -278,7 +287,7 @@ app.get('/api/config/lines', (_req, res) => {
   }
 });
 
-// GET /api/inventory — all categories
+// GET /api/inventory — all categories (recent scan only)
 app.get('/api/inventory', (_req, res) => {
   try {
     const master = loadMaster();
@@ -298,7 +307,7 @@ app.get('/api/inventory', (_req, res) => {
   }
 });
 
-// GET /api/inventory/:type — single category by component type name
+// GET /api/inventory/:type — single category by component type name (recent scan only)
 app.get('/api/inventory/:type', (req, res) => {
   try {
     const type   = req.params.type.toUpperCase();
@@ -325,21 +334,91 @@ app.get('/api/inventory/:type', (req, res) => {
   }
 });
 
+// GET /api/inventory/:type/excel — Download category Excel file (.xlsx)
+app.get('/api/inventory/:type/excel', async (req, res) => {
+  try {
+    const type   = req.params.type.toUpperCase();
+    const master = loadMaster();
+    const meta   = master.componentTypes && master.componentTypes[type];
+
+    if (!meta) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: `Unknown category "${type}"` });
+    }
+
+    const excelPath = excelManager.getExcelPath(DATA_DIR, type);
+
+    // If file doesn't exist yet, generate it from current JSON data
+    if (!fs.existsSync(excelPath)) {
+      let catData = { componentType: type, reels: [] };
+      try { catData = readJsonFile(meta.file); } catch {}
+      await excelManager.syncCategoryReelsToExcel(DATA_DIR, type, catData.reels || [], meta);
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${type}_Reel_Inventory.xlsx"`);
+    res.sendFile(excelPath);
+  } catch (err) {
+    res.status(500).json({ error: 'EXCEL_ERROR', message: err.message });
+  }
+});
+
+// GET /api/inventory/:type/history — Full historical list from Excel
+app.get('/api/inventory/:type/history', async (req, res) => {
+  try {
+    const type = req.params.type.toUpperCase();
+    const reels = await excelManager.readReelsFromExcel(DATA_DIR, type);
+    res.json({ componentType: type, totalReels: reels.length, reels });
+  } catch (err) {
+    res.status(500).json({ error: 'HISTORY_ERROR', message: err.message });
+  }
+});
+
+// GET /api/inventory/history/all — All historical records across all categories from Excel
+app.get('/api/inventory/history/all', async (_req, res) => {
+  try {
+    const master = loadMaster();
+    const result = {};
+    for (const type of Object.keys(master.componentTypes || {})) {
+      result[type] = await excelManager.readReelsFromExcel(DATA_DIR, type);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'HISTORY_ERROR', message: err.message });
+  }
+});
+
+// GET /api/inventory/export/all-excel — Download consolidated multi-sheet Excel
+app.get('/api/inventory/export/all-excel', async (_req, res) => {
+  try {
+    const master = loadMaster();
+    const workbook = await excelManager.generateMasterWorkbook(DATA_DIR, master);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="SMT_All_Categories_Inventory.xlsx"');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('[Export All Excel Error]:', err.message);
+    res.status(500).json({ error: 'EXPORT_ERROR', message: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/scan  — THE MAIN QR SCAN ENDPOINT
 //
 // Expected body:
 //   { "rawQr": "GME34681008DJRE$PP2344F$LT0016$10000" }
 //
-// Full flow:
-//   1. Parse rawQr using qr-format.json  →  { partNumber, partsId, lotId, initialQuantity }
-//   2. Look up partNumber in MASTER.json partMappings  →  { componentType, file }
-//   3. Load category JSON file
-//   4. Duplicate check: partNumber + partsId + lotId  →  exists? update : create
-//   5. If new: generate next Reel ID, insert record
-//   6. Save file  →  broadcast via Socket.io
+// Flow:
+//   1. Parse rawQr
+//   2. Look up partNumber in MASTER.json
+//   3. Generate next Reel ID (or find existing)
+//   4. Save / append full record to <CATEGORY>.xlsx
+//   5. Keep ONLY the single latest scan in <CATEGORY>.json for dashboard
+//   6. Broadcast via Socket.io
 // ─────────────────────────────────────────────────────────────────────────────
-app.post('/api/scan', (req, res) => {
+app.post('/api/scan', async (req, res) => {
   try {
     const { rawQr } = req.body;
 
@@ -347,7 +426,7 @@ app.post('/api/scan', (req, res) => {
     if (!rawQr || typeof rawQr !== 'string' || !rawQr.trim()) {
       return res.status(400).json({
         error: 'BAD_REQUEST',
-        message: 'Request body must contain "rawQr" (string). Example: "GME34681008DJRE$PP2344F$LT0016$10000"'
+        message: 'Request body must contain "rawQr" (string).'
       });
     }
 
@@ -382,40 +461,30 @@ app.post('/api/scan', (req, res) => {
     }
 
     const { componentType, file: categoryFile } = mapping;
+    const meta = master.componentTypes[componentType] || {};
 
-    // ── STEP 4: Load (or initialize) category file ──────────────────
+    // ── STEP 4: Load category file ───────────────────────────────────
     let categoryData;
     try {
       categoryData = readJsonFile(categoryFile);
     } catch {
-      // Category file doesn't exist yet — create empty structure
       categoryData = { componentType, reels: [] };
-    }
-
-    // Ensure reels array exists
-    if (!Array.isArray(categoryData.reels)) {
-      categoryData.reels = [];
     }
 
     const now = new Date().toISOString();
 
-    // ── STEP 5: Duplicate detection ─────────────────────────────────
-    // Same physical reel = same partNumber + partsId + lotId
+    // ── STEP 5: Duplicate check ──────────────────────────────────────
     const existing = findExistingReel(categoryData, partNumber, partsId, lotId);
 
     let action;
     let reelRecord;
 
     if (existing) {
-      // ── DUPLICATE: Same reel scanned again ──
-      // Re-scanning a reel that is already registered.
-      // Update the scan timestamp but do NOT change initialQuantity or reelId.
       existing.lastUpdated = now;
       existing.status = 'ACTIVE';
       action     = 'already_registered';
       reelRecord = existing;
     } else {
-      // ── NEW REEL: Insert ──
       const reelId = generateNextReelId();
       reelRecord = {
         reelId,
@@ -428,18 +497,27 @@ app.post('/api/scan', (req, res) => {
         scannedAt: now,
         lastUpdated: now
       };
-      categoryData.reels.push(reelRecord);
       action = 'created';
     }
 
-    // ── STEP 6: Save to disk ─────────────────────────────────────────
+    // Compute status level
+    reelRecord.computedStatus = computeReelStatus(reelRecord, componentType);
+
+    // ── STEP 6: Save full record into Category Excel (.xlsx) Archive ─
+    await excelManager.appendOrUpdateReelInExcel(DATA_DIR, componentType, reelRecord, meta);
+
+    // ── STEP 7: Save ONLY the single latest scan to child JSON ───────
+    categoryData.reels = [reelRecord];
     writeJsonFile(categoryFile, categoryData);
 
-    // ── STEP 7: Broadcast via Socket.io ─────────────────────────────
+    // ── STEP 8: Broadcast recent scan via Socket.io ──────────────────
     broadcastUpdate(categoryData);
+    io.emit('excel_reel_scanned', { componentType, reel: reelRecord });
 
-    // ── STEP 8: Respond ──────────────────────────────────────────────
+    // ── STEP 9: Respond ──────────────────────────────────────────────
     const httpStatus = action === 'created' ? 201 : 200;
+    const excelFilename = `${componentType}.xlsx`;
+
     return res.status(httpStatus).json({
       success: true,
       action,
@@ -450,9 +528,10 @@ app.post('/api/scan', (req, res) => {
       lotId,
       initialQuantity,
       file: categoryFile,
+      excelFile: excelFilename,
       message: action === 'created'
-        ? `New reel ${reelRecord.reelId} registered in ${categoryFile}`
-        : `Reel ${reelRecord.reelId} already registered — scan recorded`
+        ? `New reel ${reelRecord.reelId} saved to ${categoryFile} (Recent) and logged to ${excelFilename} (Excel Archive)`
+        : `Reel ${reelRecord.reelId} updated in ${categoryFile} & ${excelFilename}`
     });
 
   } catch (err) {
@@ -463,12 +542,9 @@ app.post('/api/scan', (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUT /api/reel/:reelId/quantity
-// Update remaining quantity — called when machine consumption data arrives.
-//
-// Body: { "remainingQuantity": 7500, "componentType": "CAPACITOR" }
-//       componentType is optional (speeds up search; omit to search all files)
+// Update remaining quantity
 // ─────────────────────────────────────────────────────────────────────────────
-app.put('/api/reel/:reelId/quantity', (req, res) => {
+app.put('/api/reel/:reelId/quantity', async (req, res) => {
   try {
     const { reelId } = req.params;
     const { remainingQuantity, componentType } = req.body;
@@ -481,7 +557,6 @@ app.put('/api/reel/:reelId/quantity', (req, res) => {
     }
 
     const master = loadMaster();
-    // If componentType given, only search that file; otherwise search all
     const typesToSearch = componentType
       ? [componentType.toUpperCase()]
       : Object.keys(master.componentTypes || {});
@@ -496,14 +571,19 @@ app.put('/api/reel/:reelId/quantity', (req, res) => {
       const idx = (catData.reels || []).findIndex(r => r.reelId === reelId);
       if (idx >= 0) {
         const reel = catData.reels[idx];
-
-        // Guard: can't exceed initial quantity
         const newQty = Math.max(0, Math.min(Number(remainingQuantity), reel.initialQuantity));
         reel.remainingQuantity = newQty;
         reel.lastUpdated = new Date().toISOString();
         if (newQty === 0) reel.status = 'DEPLETED';
 
+        reel.computedStatus = computeReelStatus(reel, type);
+
+        // Update in JSON
         writeJsonFile(meta.file, catData);
+
+        // Update in Excel Archive
+        await excelManager.appendOrUpdateReelInExcel(DATA_DIR, type, reel, meta);
+
         broadcastUpdate(catData);
 
         return res.json({
@@ -511,7 +591,7 @@ app.put('/api/reel/:reelId/quantity', (req, res) => {
           reelId,
           remainingQuantity: newQty,
           componentType: type,
-          status: computeReelStatus(reel)
+          status: reel.computedStatus
         });
       }
     }
@@ -528,8 +608,6 @@ app.put('/api/reel/:reelId/quantity', (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/reel/:reelId
-// Remove a reel record from its category file.
-// Query: ?componentType=CAPACITOR  (optional, speeds up search)
 // ─────────────────────────────────────────────────────────────────────────────
 app.delete('/api/reel/:reelId', (req, res) => {
   try {
@@ -566,9 +644,6 @@ app.delete('/api/reel/:reelId', (req, res) => {
 
 // ─── SOCKET.IO ───────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
-  console.log(`[Socket.io] Client connected: ${socket.id}`);
-
-  // Send full inventory snapshot on connect
   try {
     const master = loadMaster();
     const fullInventory = {};
@@ -583,24 +658,20 @@ io.on('connection', (socket) => {
   } catch (err) {
     console.error('[Socket.io] Failed to send initial inventory:', err.message);
   }
-
-  socket.on('disconnect', () => {
-    console.log(`[Socket.io] Client disconnected: ${socket.id}`);
-  });
 });
 
 // ─── START ────────────────────────────────────────────────────────────────────
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`\n╔═══════════════════════════════════════════════════╗`);
   console.log(`║  SMT Inventory Server  —  port ${PORT}              ║`);
-  console.log(`╚═══════════════════════════════════════════════════╝`);
-  console.log(`\n  QR Format:  PART_NUMBER$PARTS_ID$LOT_ID$INITIAL_QTY`);
-  console.log(`  Example:    GME34681008DJRE$PP2344F$LT0016$10000\n`);
-  console.log(`  GET  http://localhost:${PORT}/api/health`);
-  console.log(`  GET  http://localhost:${PORT}/api/config/master`);
-  console.log(`  GET  http://localhost:${PORT}/api/config/qr-format`);
-  console.log(`  GET  http://localhost:${PORT}/api/inventory`);
-  console.log(`  POST http://localhost:${PORT}/api/scan`);
-  console.log(`  PUT  http://localhost:${PORT}/api/reel/:reelId/quantity`);
-  console.log(`  DELETE http://localhost:${PORT}/api/reel/:reelId\n`);
+  console.log(`║  Excel Archiving & Recent Scan Filter Enabled     ║`);
+  console.log(`╚═══════════════════════════════════════════════════╝\n`);
+
+  await initializeExcelArchivesAndPruneJson();
+
+  console.log(`  REST Endpoints:`);
+  console.log(`  GET  http://localhost:${PORT}/api/inventory               (Recent only)`);
+  console.log(`  GET  http://localhost:${PORT}/api/inventory/:type/excel   (Category Excel)`);
+  console.log(`  GET  http://localhost:${PORT}/api/inventory/export/all-excel (All Excel)`);
+  console.log(`  POST http://localhost:${PORT}/api/scan\n`);
 });

@@ -144,5 +144,6 @@ export interface ScanResult {
   lotId: string;
   initialQuantity: number;
   file: string;
+  excelFile?: string;
   message: string;
 }

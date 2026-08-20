@@ -26,6 +26,10 @@ interface SmtState {
   /** Whether the reel inventory is loading from the backend */
   isReelInventoryLoading: boolean;
 
+  // ── LIVE EXCEL VIEWER MODAL ───────────────────────────────────
+  isLiveExcelOpen: boolean;
+  liveExcelCategory: string; // 'ALL' or componentType like 'CAPACITOR'
+
   // Actions
   setActiveLine: (lineId: string) => void;
   setSearchQuery: (query: string) => void;
@@ -49,6 +53,11 @@ interface SmtState {
   /** Set master config loaded from /api/config/master */
   setMasterConfig: (config: MasterConfig) => void;
   setIsReelInventoryLoading: (loading: boolean) => void;
+
+  // ── LIVE EXCEL ACTIONS ────────────────────────────────────────
+  openLiveExcel: (category?: string) => void;
+  closeLiveExcel: () => void;
+  setLiveExcelCategory: (category: string) => void;
 }
 
 export const useSmtStore = create<SmtState>((set) => ({
@@ -72,6 +81,10 @@ export const useSmtStore = create<SmtState>((set) => ({
   reelInventory: {},
   masterConfig: null,
   isReelInventoryLoading: false,
+
+  // Live Excel initial state
+  isLiveExcelOpen: false,
+  liveExcelCategory: 'ALL',
 
   setActiveLine: (lineId) => set({ activeLineId: lineId }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),
@@ -119,4 +132,9 @@ export const useSmtStore = create<SmtState>((set) => ({
 
   setMasterConfig: (config) => set({ masterConfig: config }),
   setIsReelInventoryLoading: (loading) => set({ isReelInventoryLoading: loading }),
+
+  // ── LIVE EXCEL ACTIONS ────────────────────────────────────────
+  openLiveExcel: (category = 'ALL') => set({ isLiveExcelOpen: true, liveExcelCategory: category }),
+  closeLiveExcel: () => set({ isLiveExcelOpen: false }),
+  setLiveExcelCategory: (category) => set({ liveExcelCategory: category }),
 }));
